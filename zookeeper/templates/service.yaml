@@ -1,0 +1,16 @@
+{{- $fullName := include "zookeeper.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "zookeeper.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: client
+      protocol: TCP
+      name: client
+  selector:
+    {{- include "zookeeper.selectorLabels" . | nindent 4 }}
