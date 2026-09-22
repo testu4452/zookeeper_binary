@@ -1,0 +1,15 @@
+replicaCount: 3
+
+image:
+  repository: zookeeper
+  tag: "3.8.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 2181
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: standard
