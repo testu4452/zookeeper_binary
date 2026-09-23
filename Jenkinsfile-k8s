@@ -1,0 +1,107 @@
+node {
+
+    try {
+
+        stage('Deploy ZooKeeper Helm Chart') {
+
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'vm',
+                    usernameVariable: 'SSH_USER',
+                    passwordVariable: 'SSH_PASS'
+                )
+            ]) {
+
+                sh """
+                    sshpass -p '${SSH_PASS}' ssh \
+                    -o StrictHostKeyChecking=no \
+                    ${SSH_USER}@10.73.76.154 <<'EOF'
+
+                    set -euxo pipefail
+
+                    echo "=========================================="
+                    echo " Kubernetes Cluster Information"
+                    echo "=========================================="
+                    kubectl cluster-info
+
+                    echo "=========================================="
+                    echo " Node Status"
+                    echo "=========================================="
+                    kubectl get nodes -o wide
+
+                    echo "=========================================="
+                    echo " Helm Repository Setup"
+                    echo "=========================================="
+                    helm repo add bitnami https://charts.bitnami.com/bitnami || true
+                    helm repo update
+
+                    echo "=========================================="
+                    echo " Remove Existing Release"
+                    echo "=========================================="
+                    helm uninstall zookeeper -n default || true
+
+                    echo "=========================================="
+                    echo " Deploy ZooKeeper"
+                    echo "=========================================="
+                    helm upgrade --install zookeeper bitnami/zookeeper \
+                                 --namespace default \
+                                 --create-namespace \
+                                 --set image.registry=docker.io \
+                                 --set image.repository=zookeeper \
+                                 --set image.tag=3.9.5 \
+                                 --set replicaCount=1 \
+                                 --set persistence.enabled=false
+
+                    echo "=========================================="
+                    echo " Helm Status"
+                    echo "=========================================="
+                    helm status zookeeper -n default || true
+
+                    echo "=========================================="
+                    echo " Pods"
+                    echo "=========================================="
+                    kubectl get pods -n default -o wide
+
+                    echo "=========================================="
+                    echo " Services"
+                    echo "=========================================="
+                    kubectl get svc -n default
+
+                    echo "=========================================="
+                    echo " PVC"
+                    echo "=========================================="
+                    kubectl get pvc -n default || true
+
+                    echo "=========================================="
+                    echo " Recent Events"
+                    echo "=========================================="
+                    kubectl get events -n default \
+                      --sort-by=.metadata.creationTimestamp | tail -20 || true
+
+                    echo "=========================================="
+                    echo " ZooKeeper Deployment Successful"
+                    echo "=========================================="
+
+EOF
+                """
+            }
+        }
+
+        currentBuild.result = 'SUCCESS'
+        echo "✅ ZooKeeper deployment completed successfully."
+
+    } catch (Exception e) {
+
+        currentBuild.result = 'FAILURE'
+        echo "❌ ZooKeeper deployment failed."
+        echo e.toString()
+
+        throw e
+
+    } finally {
+
+        stage('Post Actions') {
+            echo 'Pipeline execution completed.'
+        }
+    }
+}
